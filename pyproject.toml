@@ -1,0 +1,9 @@
+[project]
+name = "edu-bid-alert"
+version = "0.1.0"
+description = "캠프·교육 운영 입찰공고(나라장터·S2B·국가 산하기관 자체 입찰)를 매일 모아 메일로 보냄"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
