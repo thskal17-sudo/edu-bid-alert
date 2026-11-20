@@ -1,0 +1,30 @@
+name: 사이트 진단 (probe)
+
+# 새 기관 게시판을 넣기 전에 해외(GitHub) 서버에서 접속·robots.txt·목록 구조를 확인하거나,
+# 지금 설정으로 기관 입찰을 시험 수집한다 (메일·state DB 는 건드리지 않음).
+#   args 예: --direct --url-file scripts/probe_urls_agency.txt
+#            --agencies
+on:
+  workflow_dispatch:
+    inputs:
+      args:
+        description: "probe.py 인자 (예: --agencies / --direct --url https://...)"
+        required: true
+        default: "--agencies"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      # set -f: URL 의 ? 등이 파일 이름으로 확장되지 않게 함
+      - run: set -f; python scripts/probe.py $PROBE_ARGS
+        env:
+          PYTHONUNBUFFERED: "1"
+          KR_PROXY_URL: ${{ secrets.KR_PROXY_URL }}  # 국내 중계 서버. 없으면 바로 접속
+          PROBE_ARGS: ${{ github.event.inputs.args }}
