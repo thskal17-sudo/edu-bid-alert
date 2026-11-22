@@ -296,3 +296,49 @@ def test_g2b_connect_failure_retries_then_keeps_going(tmp_path):
     assert any("나라장터: 접속 실패 (ConnectTimeout)" in e for e in out.errors)
     assert not any("SECRET" in e for e in out.errors)
     assert len(out.errors) == 1  # S2B 는 그대로 돌아서 작업이 멈추지 않는다
+
+
+def test_ai_needs_an_education_word(cfg):
+    """'AI'·'인공지능' 만 있는 제목은 교육이 아니다. 캠프·강사·체험·프로그램 같은 짝 단어가 있어야 교육 (11/22)."""
+    out = [
+        "AI 기반 금형 설계 자동화를 위한 학습 데이터 생성 체계 및 AICADCAECAD 인터페이스 개발",
+        "2027년 AI 무역지원센터 운영 용역",
+        "AI 기반 보안관제센터 운영 사업(27~29년) 용역",
+        "GIST 부설 AI 영재학교 신설공사 감독권한대행 등 건설사업관리(CM)용역",
+        "AI 기반 고성능 자율주행 통합제어기",
+        "AI 고성능 GPU 학습용 워크스테이션",
+        "AI 기술 개발용 워크스테이션",
+        "AI 스마트돈사 운영 용역",
+        "AI 클러스터 기반 지식재산권(IP) 창출 및 기술사업화 지원",
+    ]
+    for title in out:
+        assert camp.topic_of(title, cfg) is None, title
+    edu = [
+        "유아・중등 AI 디지털 미디어 리터러시 교육 프로그램 운영",  # '교육'
+        "한림대학교 동계 Hallym AI-powered Global Solve-A-Thon(HAIGS) 프로그램 운영 업체 선정",  # AI + 프로그램
+        "빅데이터혁신융합대학사업_2026년 동계 AI 해커톤 프로그램 운영 용역",
+        "학교특색 교육활동 AI활용캠프 위탁 용역",
+        "2026학년도 송정초등학교 AI로봇 체험활동",  # AI + 체험
+        "AI 캠프",
+        "인공지능 특강 강사 섭외",
+    ]
+    for title in edu:
+        assert camp.topic_of(title, cfg) == camp.TOPIC_EDU, title
+    # 진로·취업·창업 단어가 있으면 그대로 진로 분야
+    assert camp.topic_of("2026학년도 거제상문중학교 2학년 인공지능 진로캠프", cfg) == camp.TOPIC_CORE
+
+
+def test_closing_soon_skips_bids_that_no_longer_match(tmp_path):
+    """이미 알린 공고라도 바뀐 키워드 규칙에 맞지 않으면 마감임박에 다시 보여주지 않는다."""
+    db = tmp_path / "p.db"
+    rows = [item("R1", "2026 진로체험 캠프 운영 용역"), item("R2", "2027년 AI 무역지원센터 운영 용역")]
+    store = camp.CampStore(db)
+    for r in rows:
+        b = to_bid(r)
+        b.tier, b.regions, b.topic = TIER_GO, [], "교육"
+        store.save(b, NOW)
+    store.mark_reported(["R1", "R2"], NOW)
+    store.close()
+    out = run_camp(db_path=db, send_mail=False, config_dir=ROOT / "config",
+                   now=datetime(2026, 10, 4, 7, 30, tzinfo=KST), client=FakeClient([]))
+    assert [b.bid_no for b in out.closing_soon] == ["R1"]
